@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curio Data Display</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Curio Data Display</h1>
+            <div class="status-bar">
+                <div id="serverStatus" class="status offline">Server: Offline</div>
+                <div id="fileStatus" class="status offline">File: Not Loaded</div>
+                <div id="updateTime" class="status">Last Update: --</div>
+            </div>
+        </header>
+
+        <main>
+            <div class="dashboard">
+                <div class="panel stats-panel">
+                    <h2>Statistics</h2>
+                    <div id="statsDisplay"></div>
+                </div>
+
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <h3>Top Replica Items</h3>
+                        <canvas id="replicaChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-wrapper">
+                        <h3>Class Distribution</h3>
+                        <canvas id="classChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-wrapper">
+                        <h3>Rare Item Mods</h3>
+                        <canvas id="rareModsChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-wrapper">
+                        <h3>Trinket Mods</h3>
+                        <canvas id="trinketModsChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-wrapper">
+                        <h3>Enchanted Mods</h3>
+                        <canvas id="enchantedModsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Auto-updating from: <code id="filePath"></code></p>
+            <p>Changes to the CSV file will automatically update the charts</p>
+        </footer>
+    </div>
+    <script type="module" src="modules/dataLoader.js"></script>
+    <script type="module" src="modules/chartManager.js"></script>
+    <script type="module" src="helpers/dataProcessor.js"></script>
+    <script type="module" src="components/StatsDisplay.js"></script>
+    <script type="module" src="components/ErrorHandler.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
