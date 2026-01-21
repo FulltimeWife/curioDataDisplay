@@ -53,7 +53,7 @@ class HeistAnalyzer {
         this.updateStatus("online");
         this.errorHandler.showError(
           `Connected to server. Watching: ${health.file}`,
-          "success"
+          "success",
         );
       } else {
         this.updateStatus("offline");
@@ -63,7 +63,7 @@ class HeistAnalyzer {
       this.updateStatus("offline");
       this.errorHandler.showError(
         "Cannot connect to server. Make sure server.js is running.",
-        "error"
+        "error",
       );
     }
   }
@@ -102,25 +102,24 @@ class HeistAnalyzer {
       this.createCharts();
 
       const timeStr = new Date().toLocaleTimeString();
-      document.getElementById(
-        "updateTime"
-      ).textContent = `Last Update: ${timeStr}`;
+      document.getElementById("updateTime").textContent =
+        `Last Update: ${timeStr}`;
 
       console.log(
-        `Data updated at ${timeStr} - ${stats.totalItems} items loaded`
+        `Data updated at ${timeStr} - ${stats.totalItems} items loaded`,
       );
     } catch (error) {
       console.error("Error processing file update:", error);
       this.errorHandler.showError(
         "Error processing data: " + error.message,
-        "error"
+        "error",
       );
     }
   }
 
   createCharts() {
     this.chartManager.destroyAll();
-    
+
     this.chartManager.createReplicaChart(this.dataLoader.getReplicaItems());
     this.chartManager.createUniqueChart(this.dataLoader.getUniqueItems());
     this.chartManager.createHeistBaseChart(this.dataLoader.getHeistBaseItems());
@@ -128,7 +127,7 @@ class HeistAnalyzer {
     this.chartManager.createRareModsChart(this.dataLoader.getRareItemMods());
     this.chartManager.createTrinketModsChart(this.dataLoader.getTrinketMods());
     this.chartManager.createEnchantedModsChart(
-      this.dataLoader.getEnchantedMods()
+      this.dataLoader.getEnchantedMods(),
     );
   }
 

@@ -1,7 +1,7 @@
 export class DataProcessor {
   getReplicaItems(data) {
     return data.filter(
-      (item) => item.DisplayName && item.DisplayName.includes("Replica")
+      (item) => item.DisplayName && item.DisplayName.includes("Replica"),
     );
   }
 
@@ -10,7 +10,7 @@ export class DataProcessor {
       (item) =>
         item.DisplayName &&
         item.Rarity === "Unique" &&
-        !item.DisplayName.includes("Replica")
+        !item.DisplayName.includes("Replica"),
     );
   }
 
@@ -19,13 +19,13 @@ export class DataProcessor {
       (item) =>
         item.Rarity === "Rare" &&
         item.BaseName &&
-        !item.BaseName?.includes("Thief's Trinket")
+        !item.BaseName?.includes("Thief's Trinket"),
     );
   }
 
   getThiefTrinkets(data) {
     return data.filter(
-      (item) => item.BaseName && item.BaseName?.includes("Thief's Trinket")
+      (item) => item.BaseName && item.BaseName?.includes("Thief's Trinket"),
     );
   }
 
@@ -35,7 +35,7 @@ export class DataProcessor {
         item.Rarity === "Rare" &&
         item.BaseName &&
         !item.Enchanted1_Display &&
-        !item.BaseName?.includes("Thief's Trinket")
+        !item.BaseName?.includes("Thief's Trinket"),
     );
   }
 
@@ -73,7 +73,7 @@ export class DataProcessor {
     const mods = [];
 
     trinkets.forEach((item) => {
-      const allModsValue = item["AllModTranslations"] || "";
+      const allModsValue = item["ModTranslations"] || "";
       if (allModsValue.trim() !== "") {
         const splitMods = allModsValue.split("|").map((mod) => mod.trim());
         splitMods.forEach((mod) => {
