@@ -26,11 +26,8 @@ export class ChartHelper {
 
   createHeistBaseChartData(heistBases) {
     const heistBaseCounts = {};
-    console.log(heistBaseCounts);
-    console.log(heistBases);
     heistBases.forEach((heistBase) => {
       const name = heistBase.DisplayName;
-      console.log(name);
       heistBaseCounts[name] = (heistBaseCounts[name] || 0) + 1;
     });
 
@@ -38,7 +35,6 @@ export class ChartHelper {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
 
-    console.log(sorted);
     return {
       labels: sorted.map(([name]) => name),
       datasets: [

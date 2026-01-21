@@ -73,7 +73,7 @@ export class DataProcessor {
     const mods = [];
 
     trinkets.forEach((item) => {
-      const allModsValue = item["ModTranslations"] || "";
+      const allModsValue = item["AllModTranslations"] || "";
       if (allModsValue.trim() !== "") {
         const splitMods = allModsValue.split("|").map((mod) => mod.trim());
         splitMods.forEach((mod) => {
