@@ -36,7 +36,7 @@ export class StatsDisplay {
                 <div class="value">${stats.uniqueClasses}</div>
             </div>
             <div class="stat-item">
-                <div class="label">Wings Ran in Pohx Keepers Restart (PL77970)(Roughly 40% of overall)</div>
+                <div class="label">Wings Ran in Pohx Keepers Restart (PL77970)</div>
                 <div class="value">${Math.round(stats.totalItems / 5)}</div>
             </div>
             

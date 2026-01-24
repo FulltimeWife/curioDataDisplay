@@ -10,18 +10,13 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.static("."));
 
-let CSV_PATH = "";
+let CSV_PATH =
+  "D:/AntiBeltMeasure/CoreJ/Plugins/Temp/CurioDataScience/heist_rewards.csv";
 let fileContent = "";
 let clients = [];
 let fileStats = {};
 
 function initializeFileSystem() {
-  if (fs.existsSync("modules/heist_rewards.csv")) {
-    CSV_PATH = "modules/heist_rewards.csv";
-  } else {
-    CSV_PATH =
-      "D:/AntiBeltMeasure/CoreJ/Plugins/Temp/CurioDataScience/heist_rewards.csv";
-  }
   try {
     if (fs.existsSync(CSV_PATH)) {
       fileContent = fs.readFileSync(CSV_PATH, "utf8");

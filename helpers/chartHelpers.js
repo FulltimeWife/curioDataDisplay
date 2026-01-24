@@ -33,7 +33,7 @@ export class ChartHelper {
 
     const sorted = Object.entries(heistBaseCounts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
+      .slice(0, 15);
 
     return {
       labels: sorted.map(([name]) => name),
@@ -89,7 +89,7 @@ export class ChartHelper {
 
     const sorted = Object.entries(classCounts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
+      .slice(0, 10);
 
     return {
       labels: sorted.map(([name]) => name),

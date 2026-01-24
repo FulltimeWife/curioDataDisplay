@@ -37,10 +37,6 @@ export class DataLoader {
     return this.processor.getAllClassNames(this.data);
   }
 
-  getActualClassNames() {
-    return this.processor.getActualClassNames(this.data);
-  }
-
   getRareItemMods() {
     return this.processor.getRareItemMods(this.data);
   }

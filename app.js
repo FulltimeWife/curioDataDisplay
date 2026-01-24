@@ -123,7 +123,7 @@ class HeistAnalyzer {
     this.chartManager.createReplicaChart(this.dataLoader.getReplicaItems());
     this.chartManager.createUniqueChart(this.dataLoader.getUniqueItems());
     this.chartManager.createHeistBaseChart(this.dataLoader.getHeistBaseItems());
-    this.chartManager.createClassChart(this.dataLoader.getActualClassNames());
+    this.chartManager.createClassChart(this.dataLoader.getAllClassNames());
     this.chartManager.createRareModsChart(this.dataLoader.getRareItemMods());
     this.chartManager.createTrinketModsChart(this.dataLoader.getTrinketMods());
     this.chartManager.createEnchantedModsChart(
