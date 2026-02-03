@@ -5,8 +5,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    sans-serif;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
 }
@@ -124,11 +125,6 @@ header h1 {
   margin-bottom: 15px;
   color: #333;
   font-size: 1.1rem;
-}
-
-.chart-wrapper canvas {
-  width: 100% !important;
-  height: 300px !important;
 }
 
 footer {

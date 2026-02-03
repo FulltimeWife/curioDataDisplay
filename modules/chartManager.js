@@ -20,19 +20,11 @@ export class ChartManager {
     }
 
     const defaultOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
+      indexAxis: "y",
+      aspectRatio: 1,
       plugins: {
         legend: {
           display: type === "pie" || type === "doughnut",
-        },
-      },
-      scales: {
-        x: {
-          ticks: {
-            stepSize: 1,
-            precision: 0,
-          },
         },
       },
     };
@@ -54,7 +46,6 @@ export class ChartManager {
       type: "bar",
       data: chartData,
       options: {
-        indexAxis: "y",
         plugins: {
           tooltip: {
             callbacks: {
@@ -74,18 +65,6 @@ export class ChartManager {
       canvasId: "uniqueChart",
       type: "bar",
       data: chartData,
-      options: {
-        indexAxis: "y",
-        plugins: {
-          tooltip: {
-            callbacks: {
-              title: (tooltipItems) => {
-                return chartData.labels[tooltipItems[0].dataIndex];
-              },
-            },
-          },
-        },
-      },
     });
   }
 
@@ -113,9 +92,6 @@ export class ChartManager {
       canvasId: "rareModsChart",
       type: "bar",
       data: chartData,
-      options: {
-        indexAxis: "y",
-      },
     });
   }
 
@@ -125,9 +101,6 @@ export class ChartManager {
       canvasId: "trinketModsChart",
       type: "bar",
       data: chartData,
-      options: {
-        indexAxis: "y",
-      },
     });
   }
 
@@ -137,9 +110,6 @@ export class ChartManager {
       canvasId: "enchantedModsChart",
       type: "bar",
       data: chartData,
-      options: {
-        indexAxis: "y",
-      },
     });
   }
 
