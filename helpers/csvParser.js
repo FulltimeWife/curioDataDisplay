@@ -10,7 +10,6 @@ export class CSVProcessor {
 
     const rawHeaders = this.parseCSVLine(lines[0]);
     this.headers = rawHeaders.map((header) => this.cleanHeader(header));
-
     this.data = lines
       .slice(1)
       .filter((line) => line.trim())

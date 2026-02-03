@@ -12,32 +12,139 @@ class HeistAnalyzer {
     this.statsDisplay = new StatsDisplay("statsDisplay");
     this.errorHandler = new ErrorHandler();
 
+    this.currentLeague = null;
+    this.availableLagues = [];
+
     this.initialize();
   }
 
   async initialize() {
     this.updateStatus("offline");
     this.setupEventHandlers();
+    this.createLeagueSelector();
 
     await this.checkServerHealth();
+    await this.loadAvailableLeagues();
 
     this.fileWatcher.connect();
-
     this.setupFileWatcherCallbacks();
+  }
+
+  async loadAvailableLeagues() {
+    try {
+      const response = await fetch("http://localhost:3000/api/leagues");
+      const data = await response.json();
+
+      this.availableLagues = data.leagues || [];
+      this.currentLeague = data.current;
+
+      this.updateLeagueSelector();
+      this.updateLeagueDisplay();
+    } catch (error) {
+      console.error("Error loading leagues: ", error);
+    }
+  }
+
+  createLeagueSelector() {
+    const statusBar = document.querySelector(".status-bar");
+    if (!statusBar) return;
+
+    const leagueContainer = document.createElement("div");
+    leagueContainer.style.cssText = `
+      display: flex;
+      align:items: center;
+      gap: 10px;
+    `;
+
+    const label = document.createElement("label");
+    label.textContent = "League: ";
+    label.style.cssText = `
+      color: white;
+      font-weight: 500;
+    `;
+
+    const select = document.createElement("select");
+    select.id = "leagueSelector";
+    select.style.cssText = `
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+    `;
+
+    select.addEventListener("change", (e) => {
+      this.switchLeague(e.target.value);
+    });
+
+    leagueContainer.appendChild(label);
+    leagueContainer.appendChild(select);
+    statusBar.appendChild(leagueContainer);
+  }
+
+  updateLeagueSelector() {
+    const select = document.getElementById("leagueSelector");
+    if (!select) return;
+
+    select.innerHTML = "";
+
+    this.availableLeagues.forEach((league) => {
+      const option = document.createElement("option");
+      option.value = league;
+      option.textContent = league;
+      option.selected = league === this.currentLeague;
+      select.appendChild(option);
+    });
+  }
+
+  async switchLeague(leagueName) {
+    try {
+      const response = await fetch("http://localhost:/api/league", {
+        method: "POST",
+        headers: {
+          "Content=Type": "application/json",
+        },
+        body: JSON.stringify({ league: leagueName }),
+      });
+
+      const data = await response.json();
+      if (data.status === "ok") {
+        this.currentLeague = leagueName;
+        this.updateLeagueDisplay();
+        this.errorHandler.showError(
+          `Switched to league: ${leagueName} (${data.totalWings} wings)`,
+          "success",
+        );
+      }
+    } catch (error) {
+      this.errorHandler.showError(
+        `Failed to switch league: ${error.message}`,
+        "error",
+      );
+    }
+  }
+
+  updateLeagueDisplay() {
+    const leagueStatus = document.getElementById("leagueStatus");
+    if (leagueStatus && this.currentLeague) {
+      leagueStatus.textContent = `League: ${this.currentLeague}`;
+    }
   }
 
   setupEventHandlers() {
     const checkHealthBtn = document.createElement("button");
     checkHealthBtn.textContent = "Check Server Health";
     checkHealthBtn.style.cssText = `
-            margin: 10px;
-            padding: 8px 16px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        `;
+      margi: 10px;
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      `;
     checkHealthBtn.onclick = () => this.checkServerHealth();
 
     const statusBar = document.querySelector(".status-bar");
@@ -51,8 +158,9 @@ class HeistAnalyzer {
       const health = await this.fileWatcher.checkHealth();
       if (health.status === "ok") {
         this.updateStatus("online");
+        this.currentLeague = health.league;
         this.errorHandler.showError(
-          `Connected to server. Watching: ${health.file}`,
+          `Connected to server, League: ${health.league} | Wings: ${health.totalWings} | Items: ${health.totalItems}`,
           "success",
         );
       } else {
@@ -62,7 +170,7 @@ class HeistAnalyzer {
     } catch (error) {
       this.updateStatus("offline");
       this.errorHandler.showError(
-        "Cannot connect to server. Make sure server.js is running.",
+        "Cannot connect to srever, Make sure server is online.",
         "error",
       );
     }
@@ -93,9 +201,11 @@ class HeistAnalyzer {
         return;
       }
 
-      this.updateFileStatus(data.stats);
+      if (data.stats) {
+        this.updateFileStatus(data.stats);
+      }
 
-      this.dataLoader.loadCSV(data.data);
+      this.dataLoader.loadJSON(data.data);
       const stats = this.dataLoader.getStats();
 
       this.statsDisplay.update(stats);
@@ -105,13 +215,19 @@ class HeistAnalyzer {
       document.getElementById("updateTime").textContent =
         `Last Update: ${timeStr}`;
 
+      if (data.changeType) {
+        console.log(
+          `${data.changeType === "added" ? "Added" : "Changed"} ${data.file} at ${timeStr}`,
+        );
+      }
+
       console.log(
-        `Data updated at ${timeStr} - ${stats.totalItems} items loaded`,
+        `Data updated: ${stats.totalItems} items frm ${stats.wingStats?.totalWings || 0} wings`,
       );
     } catch (error) {
-      console.error("Error processing file update:", error);
+      console.error("Error processing file update: ", error);
       this.errorHandler.showError(
-        "Error processing data: " + error.message,
+        "Error Processing data: " + error.message,
         "error",
       );
     }
@@ -123,7 +239,7 @@ class HeistAnalyzer {
     this.chartManager.createReplicaChart(this.dataLoader.getReplicaItems());
     this.chartManager.createUniqueChart(this.dataLoader.getUniqueItems());
     this.chartManager.createHeistBaseChart(this.dataLoader.getHeistBaseItems());
-    this.chartManager.createClassChart(this.dataLoader.getActualClassNames());
+    this.chartManager.createClassChart(this.dataLoader.getAllClassNames());
     this.chartManager.createRareModsChart(this.dataLoader.getRareItemMods());
     this.chartManager.createTrinketModsChart(this.dataLoader.getTrinketMods());
     this.chartManager.createEnchantedModsChart(
@@ -134,9 +250,7 @@ class HeistAnalyzer {
   updateStatus(status) {
     const serverStatus = document.getElementById("serverStatus");
     if (serverStatus) {
-      serverStatus.textContent = `Server: ${
-        status === "online" ? "Online" : "Offline"
-      }`;
+      serverStatus.textContent = `Server ${status === "online" ? "Online" : "Offline"}`;
       serverStatus.className = `status ${status}`;
     }
   }
@@ -146,20 +260,16 @@ class HeistAnalyzer {
     const filePath = document.getElementById("filePath");
 
     if (fileStatus) {
-      if (stats && stats.exists) {
-        const sizeKB = Math.round(stats.size / 1024);
-        const timeStr = new Date(stats.modified).toLocaleTimeString();
-        fileStatus.textContent = `File: ${sizeKB}KB (${timeStr})`;
+      if (stats && stats.totalWings !== undefined) {
+        fileStatus.textContent = `Wings: ${stats.totalWings} | Items: ${stats.totalItems}`;
         fileStatus.className = "status online";
       } else {
-        fileStatus.textContent = "File: Not Found";
+        fileStatus.textContent = "No Data";
         fileStatus.className = "status offline";
       }
     }
-
-    if (filePath) {
-      filePath.textContent =
-        "D:/AntiBeltMeasure/CoreJ/Plugins/Temp/CurioDataScience/heist_rewards.csv";
+    if (filePath && this.currentLeague) {
+      filePath.textContent = `${this.currentLeague}/**/*.json`;
     }
   }
 
