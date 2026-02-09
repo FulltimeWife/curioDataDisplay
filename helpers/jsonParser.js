@@ -1,103 +1,110 @@
 export class JSONProcessor {
-  constructor(jsonData) {
-    this.jsonData = jsonData;
+  constructor() {
     this.data = [];
+    this.metadata = {
+      leagueName: null,
+      zoneName: null,
+      partial: false,
+      areaLevel: null,
+    };
   }
 
-  parse() {
+  parseSingle(jsonText) {
+    try {
+      const json = JSON.parse(jsonText);
+      return this.extractRewards(json);
+    } catch (error) {
+      console.error("Error parsing JSON: ", error);
+      return [];
+    }
+  }
+
+  parseMultiple(jsonFiles) {
     this.data = [];
-
-    const wings = Array.isArray(this.jsonData)
-      ? this.jsonData
-      : [this.jsonData];
-
-    wings.forEach((wing) => {
-      if (!wing.rewards || !wing.rewards.rewardData) {
-        console.warn("Invalid wing structure: ", wing);
-        return;
-      }
-
-      wing.rewards.rewardData.forEach((item) => {
-        const parsedItem = this.parseItem(item, wing);
-        this.data.push(parsedItem);
-      });
+    jsonFiles.forEach((jsonText) => {
+      const items = this.parseSingle(jsonText);
+      this.data.push(...items);
     });
 
-    return this.data();
+    return this.data;
   }
 
-  parseItem(item, wing) {
-    const parsedItem = {
-      WingId: wing.id,
-      League: wing.leagueName,
-      ZoneName: wing.zoneName,
-      AreaLevel: wing.areaLevel,
-      Partial: wing.partial || false,
-
-      ItemId: item.id,
-      Timestamp: item.timestamp,
-      BaseName: item.baseName || "",
-      DisplayName: item.displayName || "",
-      ClassName: item.className || "",
-      Rarity: item.rarity || "",
-      StackSize: item.stackSize || "",
-    };
-
-    if (item.mods) {
-      this.parseMods(parsedItem, item.mods);
+  extractRewards(jsonData) {
+    const items = [];
+    if (!jsonData.rewards || !jsonData.rewards.rewardData) {
+      console.warn(`No reward data found in JSON: ${jsonData}`);
+      return items;
     }
 
-    return parsedItem;
+    const metadata = {
+      leagueName: jsonData.leagueName || "Unknown",
+      zoneName: jsonData.zoneName || "Unknown",
+      partial: jsonData.partial || false,
+      areaLevel: jsonData.areaLevel || 83,
+      heistId: jsonData.id || null,
+    };
+
+    jsonData.rewards.rewardData.forEach((reward) => {
+      items.push(this.transformReward(reward, metadata));
+    });
+    return items;
   }
 
-  parseMods(parsedItem, mods) {
+  transformReward(reward, metadata) {
+    const item = {
+      DisplayName: reward.displayName || "",
+      BaseName: reward.baseName || "",
+      ClassName: reward.className || "",
+      Rarity: reward.rarity || "",
+      LeagueName: metadata.leagueName,
+      ZoneName: metadata.zoneName,
+      Partial: metadata.partial,
+      AreaLevel: metadata.areaLevel,
+      HeistId: metadata.heistId,
+      Timestamp: reward.timestamp || "",
+      ItemId: reward.id || "",
+      StackSize: reward.stackSize || 0,
+      ...this.processMods(reward.mods || {}),
+    };
+    return item;
+  }
+
+  processMods(mods) {
+    const result = {};
+
     if (mods.explicitMods && Array.isArray(mods.explicitMods)) {
       mods.explicitMods.forEach((mod, index) => {
-        const modNum = index + 1;
-        parsedItem[`Explicit${modNum}_Display`] = mod.display || "";
-        parsedItem[`Explicit${modNum}_Translation`] = mod.translation || "";
-        parsedItem[`Explicit${modNum}_Values`] = mod.value || "";
-        parsedItem[`Explicit${modNum}_Raw`] = mod.raw || "";
+        if (index < 6) {
+          const num = index + 1;
+          result[`Explicit${num}_Display`] = mod.display || "";
+          result[`Explicit${num}_Translation`] = mod.translation || "";
+          result[`Explicit${num}_Value`] = mod.value || "";
+          result[`Explicit${num}_Raw`] = mod.raw || "";
+        }
       });
-
-      parsedItem.ModTranslations = mods.explicitMods
-        .map((mod) => mod.translation)
-        .filter((t) => t)
-        .join(" | ");
     }
 
     if (mods.enchantedMods && Array.isArray(mods.enchantedMods)) {
       mods.enchantedMods.forEach((mod, index) => {
-        const modNum = index + 1;
-        parsedItem[`Enchanted${modNum}_Display`] = mod.display || "";
-        parsedItem[`Enchanted${modNum}_Translation`] = mod.translation || "";
-        parsedItem[`Enchanted${modNum}_Values`] = mod.value || "";
-        parsedItem[`Enchanted${modNum}_Raw`] = mod.raw || "";
+        if (index < 1) {
+          result[`Enchanted1_Display`] = mod.display || "";
+          result[`Enchanted1_Translation`] = mod.translation || "";
+          result[`Enchanted1_Value`] = mod.value || "";
+          result[`Enchanted1_Raw`] = mod.raw || "";
+        }
       });
     }
+
+    if (mods.explicitMods && Array.isArray(mods.explicitMods)) {
+      const translations = mods.explicitMods
+        .map((mod) => mod.translation || "")
+        .filter((t) => t.trim() !== "");
+      result["ModTranslations"] = translations.join("|");
+    }
+    return result;
   }
 
   getData() {
     return this.data;
-  }
-
-  getWings() {
-    const wingsMap = new Map();
-
-    this.data.forEach((item) => {
-      if (!wingsMap.has(item.WingId)) {
-        wingsMap.set(item.WingId, {
-          id: item.WingId,
-          league: item.League,
-          zoneName: item.ZoneName,
-          areaLevel: item.AreaLevel,
-          partial: item.Partial,
-          itemCount: 0,
-        });
-      }
-      wingsMap.get(item.WingId).itemCount++;
-    });
-
-    return Array.from(wingsMap.values());
   }
 }

@@ -9,16 +9,58 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.static("."));
+app.use(express.json());
 
-const EXPORTS_DIR = "C:/Users/jessi/OneDrive/Desktop/transfer/exports";
+const EXPORTS_DIR =
+  "D:/AntiBeltMeasure/CoreJ/Plugins/Temp/CurioDataScience/exports";
+let defaultLeagueName = "Phrecia 2.0";
 let clients = [];
 let allJsonFiles = [];
+let parsedData = [];
 let fileStats = {
   exists: false,
   fileCount: 0,
   lastModified: null,
   totalSize: 0,
 };
+
+function parseJsonData(jsonText, sourcePath = null) {
+  try {
+    const cleaned = String(jsonText)
+      .replace(/^\uFEFF/, "")
+      .replace(/^[\u0000-\u001F]+/, "");
+    const json = JSON.parse(cleaned);
+    const items = [];
+    if (!json.rewards || !json.rewards.rewardData) return items;
+    const metadata = {
+      leagueName: json.leagueName || defaultLeagueName,
+      zoneName: json.zoneName || "",
+      partial: json.partial || false,
+      areaLevel: json.areaLevel || 83,
+      heistId: json.id || null,
+    };
+
+    json.rewards.rewardData.forEach((reward) => {
+      items.push({
+        DisplayName: reward.displayName || "",
+        BaseName: reward.baseName || "",
+        Rarity: reward.rarity || "",
+        LeagueName: metadata.leagueName,
+        ZoneName: metadata.zoneName,
+        Partial: metadata.partial,
+        AreaLevel: metadata.areaLevel,
+        HeistId: metadata.heistId,
+      });
+    });
+    return items;
+  } catch (error) {
+    console.error(
+      `Error parsing JSON${sourcePath ? ` in ${sourcePath}` : ""}:`,
+      error,
+    );
+    return [];
+  }
+}
 
 function loadAllJsonFiles() {
   try {
@@ -44,21 +86,36 @@ function loadAllJsonFiles() {
     };
 
     findJsonFiles(EXPORTS_DIR);
-
-    allJsonFiles = jsonFiles
+    const filesRead = jsonFiles
       .map((filePath) => {
         try {
-          return fs.readFileSync(filePath, "utf8");
+          const raw = fs.readFileSync(filePath, "utf8");
+          const cleaned = String(raw)
+            .replace(/^\uFEFF/, "")
+            .replace(/^[\u0000-\u001F]+/, "");
+          const trimmed = cleaned.trim();
+          if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+            console.warn(`Skipping non-JSON file: ${filePath}`);
+            return null;
+          }
+          return { filePath, content: cleaned };
         } catch (error) {
           console.error(`Error reading file path: ${filePath}`, error.message);
           return null;
         }
       })
-      .filter((content) => content !== null);
+      .filter((entry) => entry !== null);
+
+    allJsonFiles = filesRead.map((f) => f.content);
+
+    parsedData = [];
+    filesRead.forEach(({ filePath, content }) => {
+      const items = parseJsonData(content, filePath);
+      parsedData.push(...items);
+    });
 
     let totalSize = 0;
     let latestModified = null;
-
     jsonFiles.forEach((filePath) => {
       try {
         const stat = fs.statSync(filePath);
@@ -143,6 +200,7 @@ app.get("/api/health", (req, res) => {
     totalSize: fileStats.totalSize,
     lastModified: fileStats.lastModified,
     clientsConnected: clients.length,
+    totalItems: parsedData.length,
   });
 });
 
@@ -184,11 +242,88 @@ app.get("/api/stream", (req, res) => {
   console.log(`Client connected: ${clientId}, (Total: ${clients.length})`);
 
   req.on("close", () => {
-    clients.client.filter((client) => client !== res);
+    clients = clients.filter((client) => client !== res);
     console.log(
       `Client disconnected: ${clientId}, (Remaining: ${clients.length})`,
     );
   });
+});
+
+app.get("/api/obs/stats", (req, res) => {
+  try {
+    const leagueFilter = req.query.league;
+    const itemsFilter = req.query.items
+      ? req.query.items.split(",").map((i) => i.trim())
+      : [];
+    let filteredData = parsedData;
+    if (leagueFilter && leagueFilter !== "All") {
+      filteredData = parsedData.filter(
+        (item) => item.LeagueName === leagueFilter,
+      );
+    }
+    const totalItems = filteredData.length;
+    const wingsRan = Math.round(totalItems / 5);
+    const itemCounts = {};
+    if (itemsFilter.length > 0) {
+      itemsFilter.forEach((itemName) => {
+        itemCounts[itemName] = 0;
+      });
+      filteredData.forEach((item) => {
+        itemsFilter.forEach((itemName) => {
+          if (item.DisplayName === itemName || item.BaseName === itemName) {
+            itemCounts[itemName]++;
+          }
+        });
+      });
+    }
+    const response = {
+      wingsRan: wingsRan,
+      itemsSeen: totalItems,
+      league: leagueFilter || defaultLeagueName,
+      itemCounts: itemCounts,
+      timestamp: new Date().toISOString(),
+    };
+    res.json(response);
+  } catch (error) {
+    console.error("Error in OBS stats endpoint:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/api/obs/stats", (req, res) => {
+  try {
+    const { league, items } = req.body;
+    let filteredData = parsedData;
+    if (league && league !== "All") {
+      filteredData = parsedData.filter((item) => item.LeagueName === league);
+    }
+    const totalItems = filteredData.length;
+    const wingsRan = Math.round(totalItems / 5);
+    const itemCounts = {};
+    if (items && Array.isArray(items) && items.length > 0) {
+      items.forEach((itemName) => {
+        itemCounts[itemName] = 0;
+      });
+      filteredData.forEach((item) => {
+        items.forEach((itemName) => {
+          if (item.DisplayName === itemName || item.BaseName === itemName) {
+            itemCounts[itemName]++;
+          }
+        });
+      });
+    }
+    const response = {
+      wingsRan: wingsRan,
+      itemsSeen: totalItems,
+      league: league || defaultLeagueName,
+      itemCounts: itemCounts,
+      timestamp: new Date().toISOString(),
+    };
+    res.json(response);
+  } catch (error) {
+    console.error("Error in OBS stats endpoint:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 loadAllJsonFiles();
@@ -201,6 +336,9 @@ app.listen(PORT, () => {
   console.log(`   http://localhost:${PORT}/api/health`);
   console.log(`   http://localhost:${PORT}/api/files`);
   console.log(`   http://localhost:${PORT}/api/stream`);
+  console.log(`   http://localhost:${PORT}/api/obs/stats`);
+  console.log(`   OBS Overlay:`);
+  console.log(`   http://localhost:${PORT}/obs/index.html`);
 });
 
 process.on("SIGINT", () => {

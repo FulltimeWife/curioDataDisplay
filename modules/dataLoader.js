@@ -1,4 +1,3 @@
-import { CSVProcessor } from "../helpers/csvParser.js";
 import { DataProcessor } from "../helpers/dataProcessor.js";
 import { JSONProcessor } from "../helpers/jsonParser.js";
 
@@ -67,6 +66,11 @@ export class DataLoader {
 
   getReplicaItems() {
     const filtered = this.getFilteredData();
+    return this.processor.getReplicaItems(filtered);
+  }
+
+  getUniqueItems() {
+    const filtered = this.getFilteredData();
     return this.processor.getUniqueItems(filtered);
   }
 
@@ -83,6 +87,11 @@ export class DataLoader {
   getThiefTrinkets() {
     const filtered = this.getFilteredData();
     return this.processor.getThiefsTrinkets(filtered);
+  }
+
+  getAllClassNames() {
+    const filtered = this.getFilteredData();
+    return this.processor.getAllClassNames(filtered);
   }
 
   getRareItemMods() {

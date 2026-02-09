@@ -25,12 +25,14 @@ class HeistAnalyzer {
     this.createFilterControls();
 
     await this.checkServerHealth();
+
+    this.fileWatcher.connect();
     this.setupFileWatcherCallbacks();
   }
 
   showLoadingOverlay(message = "Loading") {
     this.isLoading = true;
-    let overlay = DocumentTimeline.getElementById("loadingOverlay");
+    let overlay = document.getElementById("loadingOverlay");
 
     if (!overlay) {
       overlay = document.createElement("div");
@@ -85,14 +87,14 @@ class HeistAnalyzer {
 
         <div class="filter-group">
           <label class="filter-label" for="characterFilter"> Character </label>
-          <select id="characterFilter class="filter-select">
+          <select id="characterFilter" class="filter-select">
             <option value="All"> All Characters</option>
           </select>
         </div>
       </div>
 
       <div class="filter-actions">
-        <button class="filter-clear-btn"> id="clearFiltersBtn" disabled> Clear Filters </button>
+        <button class="filter-clear-btn" id="clearFiltersBtn" disabled> Clear Filters </button>
         <button class="filter-exports-btn> id="exportDataBtn"> Export Data </button>
       </div>
     `;
@@ -105,7 +107,7 @@ class HeistAnalyzer {
   setupFilterEventListeners() {
     const leagueSelect = document.getElementById("leagueFilter");
     const characterSelect = document.getElementById("characterFilter");
-    const cleraBtn = document.getElementById("clearFiltersBtn");
+    const clearBtn = document.getElementById("clearFiltersBtn");
     const exportBtn = document.getElementById("exportDataBtn");
 
     if (leagueSelect) {
@@ -120,8 +122,8 @@ class HeistAnalyzer {
       });
     }
 
-    if (cleraBtn) {
-      cleraBtn.addEventListener("click", () => {
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
         this.clearAllFilters();
       });
     }
@@ -492,7 +494,7 @@ class HeistAnalyzer {
 
     if (filePath) {
       filePath.textContent =
-        "C:/Users/jessi/OneDrive/Desktop/transfer/exports/**/*.json";
+        "D:/AntiBeltMeasure/CoreJ/Plugins/Temp/CurioDataScience/exports/**/*.json";
     }
   }
 
