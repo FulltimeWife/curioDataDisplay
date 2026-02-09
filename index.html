@@ -14,7 +14,6 @@
         <div class="status-bar">
           <div id="serverStatus" class="status offline">Server: Offline</div>
           <div id="fileStatus" class="status offline">File: Not Loaded</div>
-          <div id="updateTime" class="status">Last Update: --</div>
         </div>
       </header>
 
@@ -65,8 +64,8 @@
       </main>
 
       <footer>
-        <p>Auto-updating from: <code id="filePath"></code></p>
-        <p>Changes to the CSV file will automatically update the charts</p>
+        <p id="updateTime">Last Update: Never</p>
+        <p>Watching: <code id="filePath"> Connecting...</code></p>
       </footer>
     </div>
     <script type="module" src="modules/dataLoader.js"></script>

@@ -12,145 +12,353 @@ class HeistAnalyzer {
     this.statsDisplay = new StatsDisplay("statsDisplay");
     this.errorHandler = new ErrorHandler();
 
-    this.currentLeague = null;
-    this.availableLagues = [];
+    this.isLoading = false;
+    this.hasData = false;
 
     this.initialize();
   }
 
   async initialize() {
+    this.showLoadingOverlay("Connecting to server");
     this.updateStatus("offline");
     this.setupEventHandlers();
-    this.createLeagueSelector();
+    this.createFilterControls();
 
     await this.checkServerHealth();
-    await this.loadAvailableLeagues();
-
-    this.fileWatcher.connect();
     this.setupFileWatcherCallbacks();
   }
 
-  async loadAvailableLeagues() {
-    try {
-      const response = await fetch("http://localhost:3000/api/leagues");
-      const data = await response.json();
+  showLoadingOverlay(message = "Loading") {
+    this.isLoading = true;
+    let overlay = DocumentTimeline.getElementById("loadingOverlay");
 
-      this.availableLagues = data.leagues || [];
-      this.currentLeague = data.current;
-
-      this.updateLeagueSelector();
-      this.updateLeagueDisplay();
-    } catch (error) {
-      console.error("Error loading leagues: ", error);
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "loadingOverlay";
+      overlay.className = "loading-overlay";
+      overlay.innerHTML = `
+        <div class="loading-spinner"></div>
+        <div class="loading-text">${message}</div>
+      `;
+      document.body.appendChild(overlay);
+    } else {
+      overlay.querySelector(".loading-text").textContent = message;
+      overlay.classList.remove("hidden");
     }
   }
 
-  createLeagueSelector() {
-    const statusBar = document.querySelector(".status-bar");
-    if (!statusBar) return;
-
-    const leagueContainer = document.createElement("div");
-    leagueContainer.style.cssText = `
-      display: flex;
-      align:items: center;
-      gap: 10px;
-    `;
-
-    const label = document.createElement("label");
-    label.textContent = "League: ";
-    label.style.cssText = `
-      color: white;
-      font-weight: 500;
-    `;
-
-    const select = document.createElement("select");
-    select.id = "leagueSelector";
-    select.style.cssText = `
-      padding: 6px 12px;
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      cursor: pointer;
-      font-size: 0.9rem;
-    `;
-
-    select.addEventListener("change", (e) => {
-      this.switchLeague(e.target.value);
-    });
-
-    leagueContainer.appendChild(label);
-    leagueContainer.appendChild(select);
-    statusBar.appendChild(leagueContainer);
+  hideLoadingOverlay() {
+    this.isLoading = false;
+    const overlay = document.getElementById("loadingOverlay");
+    if (overlay) {
+      overlay.classList.add("hidden");
+      setTimeout(() => overlay.remove(), 300);
+    }
   }
 
-  updateLeagueSelector() {
-    const select = document.getElementById("leagueSelector");
-    if (!select) return;
-
-    select.innerHTML = "";
-
-    this.availableLeagues.forEach((league) => {
-      const option = document.createElement("option");
-      option.value = league;
-      option.textContent = league;
-      option.selected = league === this.currentLeague;
-      select.appendChild(option);
-    });
+  showEmptyState(container, message) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "empty-state";
+    emptyState.innerHTML = `
+      <div class="empty-state-title">No Data Available</div>
+      <div class="empty-state-text">${message}<div>
+      <div class="empty-state-subtext>Try adjusting your filters to see more data (or wait for data to be collected with your filters)</div>
+    `;
+    container.innerHTML = "";
+    container.appendChild(emptyState);
   }
 
-  async switchLeague(leagueName) {
+  createFilterControls() {
+    const header = document.querySelector("header");
+    if (!header) return;
+
+    const filterSection = document.createElement("div");
+    filterSection.className = "filter-section";
+    filterSection.innerHTML = `
+      <div class="filter-container">
+        <div class="filter-group">
+          <label class="filter-label" for="leagueFilter"> League </label>
+          <select id="leagueFilter" class="filter-select">
+            <option value="All"> All Leagues</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="characterFilter"> Character </label>
+          <select id="characterFilter class="filter-select">
+            <option value="All"> All Characters</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button class="filter-clear-btn"> id="clearFiltersBtn" disabled> Clear Filters </button>
+        <button class="filter-exports-btn> id="exportDataBtn"> Export Data </button>
+      </div>
+    `;
+
+    header.parentNode.insertBefore(filterSection, header.nextSibling);
+
+    this.setupFilterEventListeners();
+  }
+
+  setupFilterEventListeners() {
+    const leagueSelect = document.getElementById("leagueFilter");
+    const characterSelect = document.getElementById("characterFilter");
+    const cleraBtn = document.getElementById("clearFiltersBtn");
+    const exportBtn = document.getElementById("exportDataBtn");
+
+    if (leagueSelect) {
+      leagueSelect.addEventListener("change", (e) => {
+        this.handleFilterChange("league", e.target.value);
+      });
+    }
+
+    if (characterSelect) {
+      characterSelect.addEventListener("change", (e) => {
+        this.handleFilterChange("character", e.target.value);
+      });
+    }
+
+    if (cleraBtn) {
+      cleraBtn.addEventListener("click", () => {
+        this.clearAllFilters();
+      });
+    }
+
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        this.exportData();
+      });
+    }
+  }
+
+  handleFilterChange(filterType, value) {
+    if (filterType === "league") {
+      this.dataLoader.setLeagueFilter(value);
+    } else if (filterType === "character") {
+      this.dataLoader.setCharacterFilter(value);
+    }
+
+    this.updateFilterActiveStates();
+    this.updateDisplay();
+    this.updateClearButtonState();
+  }
+
+  updateFilterActiveStates() {
+    const leagueSelect = document.getElementById("leagueFilter");
+    const characterSelect = document.getElementById("characterFilter");
+
+    if (leagueSelect) {
+      if (leagueSelect.value !== "All") {
+        leagueSelect.classList.add("active");
+      } else {
+        leagueSelect.classList.remove("active");
+      }
+    }
+
+    if (characterSelect) {
+      if (characterSelect.value !== "All") {
+        characterSelect.classList.add("active");
+      } else {
+        characterSelect.classList.remove("active");
+      }
+    }
+  }
+
+  updateClearButtonState() {
+    const clearBtn = document.getElementById("clearFiltersBtn");
+    const leagueSelect = document.getElementById("leagueFilter");
+    const characterSelect = document.getElementById("characterFilter");
+
+    if (clearBtn) {
+      const hasActiveFilters =
+        (leagueSelect && leagueSelect.value !== "All") ||
+        (characterSelect && characterSelect.value !== "All");
+      clearBtn.disabled = !hasActiveFilters;
+    }
+  }
+
+  clearAllFilters() {
+    const leagueSelect = document.getElementById("leagueFilter");
+    const characterSelect = document.getElementById("characterFilter");
+
+    if (leagueSelect) {
+      leagueSelect.value = "All";
+      leagueSelect.classList.remove("active");
+    }
+
+    if (characterSelect) {
+      characterSelect.value = "All";
+      characterSelect.classList.remove("active");
+    }
+
+    this.dataLoader.setLeagueFilter("All");
+    this.dataLoader.setCharacterFilter("All");
+
+    this.updateDisplay();
+    this.updateClearButtonState();
+
+    this.error.showError("Filters cleared", "success");
+  }
+
+  exportData() {
     try {
-      const response = await fetch("http://localhost:/api/league", {
-        method: "POST",
-        headers: {
-          "Content=Type": "application/json",
-        },
-        body: JSON.stringify({ league: leagueName }),
+      const stats = this.dataLoader.getStats();
+      const filteredData = this.dataLoader.getFilteredData();
+
+      if (filteredData.length === 0) {
+        this.errorHandler.showError("No data to export", "warning");
+        return;
+      }
+
+      let csv = "Display Name,Base Name,Class,Rarity,League,Zone,Level\n";
+
+      filteredData.forEach((item) => {
+        const row = [
+          this.escapeCsv(item.DisplayName),
+          this.escapeCsv(item.BaseName),
+          this.escapeCsv(item.Rarity),
+          this.escapeCsv(item.LeagueName),
+          this.escapeCsv(item.ZoneName),
+          item.AreaLevel || "",
+        ];
+        csv += row.join(",") + "\n";
       });
 
-      const data = await response.json();
-      if (data.status === "ok") {
-        this.currentLeague = leagueName;
-        this.updateLeagueDisplay();
-        this.errorHandler.showError(
-          `Switched to league: ${leagueName} (${data.totalWings} wings)`,
-          "success",
-        );
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+
+      const leagueFilter = this.dataLoader.currentFilters.leagueName;
+      const charFilter = this.dataLoader.currentFilters.characterName;
+      const timestamp = new Date().toISOString().split("T")[0];
+      let filename = `heist-data-${timestamp}`;
+
+      if (leagueFilter !== "All") {
+        filename += `-${leagueFilter.replace(/\s+/g, "-")}`;
       }
-    } catch (error) {
+      if (charFilter !== "All") {
+        filename += `-${charFilter.replace(/\s+/g, "-")}`;
+      }
+      filename += ".csv";
+
+      link.download = filename;
+      document.body.append(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
       this.errorHandler.showError(
-        `Failed to switch league: ${error.message}`,
-        "error",
+        `Exported ${filteredData.length} items to ${filename}`,
+        "success",
       );
+    } catch (error) {
+      console.error("Error exporting data: ", error);
+      this.errorHandler.showError("Failed to export data", "error");
     }
   }
 
-  updateLeagueDisplay() {
-    const leagueStatus = document.getElementById("leagueStatus");
-    if (leagueStatus && this.currentLeague) {
-      leagueStatus.textContent = `League: ${this.currentLeague}`;
+  escapeCsv(value) {
+    if (value === null || value === undefined) return "";
+    const str = String(value);
+    if (str.includes(",") || str.includes('"') | str.includes("\n")) {
+      return `${str.replace(/"/g, '""')}`;
     }
+    return str;
+  }
+
+  updateFilterOptions() {
+    const leagueSelect = document.getElementById("leagueFilter");
+    if (leagueSelect) {
+      const currentValue = leagueSelect.value;
+      const leagues = this.dataLoader.getAvailableLeagues();
+
+      leagueSelect.innerHTML = '<option value="All">All Leagues</option>';
+      leagues.forEach((league) => {
+        const option = document.createElement("option");
+        option.value = league;
+        option.textContent = league;
+        if (league === currentValue) option.selected = true;
+        leagueSelect.appendChild(option);
+      });
+    }
+
+    const characterSelect = document.getElementById("characterFilter");
+    if (characterSelect) {
+      const currentValue = characterSelect.value;
+      const characters = this.dataLoader.getAvailableCharacters();
+
+      characterSelect.innerHTML = '<option value="All">All Characters</option>';
+
+      if (characters.length > 0) {
+        characters.forEach((character) => {
+          const option = document.createElement("option");
+          option.value = character;
+          option.textContent = character;
+          if (character === currentValue) option.selected = true;
+          characterSelect.appendChild(option);
+        });
+      }
+    }
+
+    this.updateFilterActiveStates();
+    this.updateClearButtonState();
+  }
+
+  updateDisplay() {
+    const stats = this.dataLoader.getStats();
+
+    if (stats.totalItems === 0) {
+      this.hasData = false;
+      this.showEmptyStateForDashboard();
+      return;
+    }
+
+    this.hasData = true;
+    this.statsDisplay.update(stats);
+    this.createCharts();
+
+    const timeStr = new Date().toLocaleTimeString();
+    const updateTimeEl = document.getElementById("updateTime");
+    if (updateTimeEl) updateTimeEl.textContent = `Last Update: ${timeStr}`;
+
+    console.log(
+      `Display updated at ${timeStr} - ${stats.totalItems} items shown`,
+    );
+  }
+
+  showEmptyStateForDashboard() {
+    const statsDisplay = document.getElementById("statsDisplay");
+    if (statsDisplay) {
+      this.showEmptyState(
+        statsDisplay,
+        "No heist data found, make sure your exports contains files and server is running",
+      );
+    }
+
+    this.chartManager.destroyAll();
   }
 
   setupEventHandlers() {
     const checkHealthBtn = document.createElement("button");
     checkHealthBtn.textContent = "Check Server Health";
     checkHealthBtn.style.cssText = `
-      margi: 10px;
+      margin: 10px;
       padding: 8px 16px;
-      background: #4CAF50;
+      background: rgba(75,175,80,0.9);
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
-      `;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    `;
     checkHealthBtn.onclick = () => this.checkServerHealth();
 
     const statusBar = document.querySelector(".status-bar");
-    if (statusBar) {
-      statusBar.appendChild(checkHealthBtn);
-    }
+    if (statusBar) statusBar.appendChild(checkHealthBtn);
   }
 
   async checkServerHealth() {
@@ -158,9 +366,8 @@ class HeistAnalyzer {
       const health = await this.fileWatcher.checkHealth();
       if (health.status === "ok") {
         this.updateStatus("online");
-        this.currentLeague = health.league;
         this.errorHandler.showError(
-          `Connected to server, League: ${health.league} | Wings: ${health.totalWings} | Items: ${health.totalItems}`,
+          `Connected to server, watching ${health.fileCount} files in ${health.directory}`,
           "success",
         );
       } else {
@@ -169,10 +376,7 @@ class HeistAnalyzer {
       }
     } catch (error) {
       this.updateStatus("offline");
-      this.errorHandler.showError(
-        "Cannot connect to srever, Make sure server is online.",
-        "error",
-      );
+      this.errorHandler.showError("Cannot connect to server", "error");
     }
   }
 
@@ -185,6 +389,7 @@ class HeistAnalyzer {
     this.fileWatcher.onError((message) => {
       this.updateStatus("offline");
       this.errorHandler.showError(message, "error");
+      this.hideLoadingOverlay();
     });
 
     this.fileWatcher.onUpdate((data) => {
@@ -198,59 +403,71 @@ class HeistAnalyzer {
 
       if (data.type === "error") {
         this.errorHandler.showError(data.message, "error");
+        this.hideLoadingOverlay();
         return;
       }
 
-      if (data.stats) {
-        this.updateFileStatus(data.stats);
+      this.updateFileStatus(data.stats);
+
+      if (Array.isArray(data.data)) {
+        this.dataLoader.loadMultipleJSON(data.data);
+      } else {
+        this.dataLoader.loadJSON(data.data);
       }
 
-      this.dataLoader.loadJSON(data.data);
-      const stats = this.dataLoader.getStats();
+      this.updateFilterOptions();
+      this.updateDisplay();
+      this.hideLoadingOverlay();
 
-      this.statsDisplay.update(stats);
-      this.createCharts();
-
-      const timeStr = new Date().toLocaleTimeString();
-      document.getElementById("updateTime").textContent =
-        `Last Update: ${timeStr}`;
-
-      if (data.changeType) {
-        console.log(
-          `${data.changeType === "added" ? "Added" : "Changed"} ${data.file} at ${timeStr}`,
+      if (data.type === "init") {
+        const stats = this.dataLoader.getStats();
+        this.errorHandler.showError(
+          `Loaded ${stats.totalItems} items from ${data.stats.fileCount} files`,
+          "success",
         );
       }
-
-      console.log(
-        `Data updated: ${stats.totalItems} items frm ${stats.wingStats?.totalWings || 0} wings`,
-      );
     } catch (error) {
       console.error("Error processing file update: ", error);
       this.errorHandler.showError(
-        "Error Processing data: " + error.message,
+        "Error processing data: " + error.message,
         "error",
       );
+      this.hideLoadingOverlay();
     }
   }
 
   createCharts() {
     this.chartManager.destroyAll();
 
-    this.chartManager.createReplicaChart(this.dataLoader.getReplicaItems());
-    this.chartManager.createUniqueChart(this.dataLoader.getUniqueItems());
-    this.chartManager.createHeistBaseChart(this.dataLoader.getHeistBaseItems());
-    this.chartManager.createClassChart(this.dataLoader.getAllClassNames());
-    this.chartManager.createRareModsChart(this.dataLoader.getRareItemMods());
-    this.chartManager.createTrinketModsChart(this.dataLoader.getTrinketMods());
-    this.chartManager.createEnchantedModsChart(
-      this.dataLoader.getEnchantedMods(),
-    );
+    const replicaItems = this.dataLoader.getReplicaItems();
+    const uniqueItems = this.dataLoader.getUniqueItems();
+    const heistBaseItems = this.dataLoader.getHeistBaseItems();
+    const classNames = this.dataLoader.getAllClassNames();
+    const rareItemMods = this.dataLoader.getRareItemMods();
+    const trinketMods = this.dataLoader.getTrinketMods();
+    const enchantedMods = this.dataLoader.getEnchantedMods();
+
+    if (replicaItems.length > 0)
+      this.chartManager.createReplicaChart(replicaItems);
+    if (uniqueItems.length > 0)
+      this.chartManager.createUniqueChart(uniqueItems);
+    if (heistBaseItems.length > 0)
+      this.chartManager.createHeistBaseChart(heistBaseItems);
+    if (classNames.length > 0) this.chartManager.createClassChart(classNames);
+    if (rareItemMods.length > 0)
+      this.chartManager.createRareModsChart(rareItemMods);
+    if (trinketMods.length > 0)
+      this.chartManager.createTrinketModsChart(trinketMods);
+    if (enchantedMods.length > 0)
+      this.chartManager.createEnchantedModsChart(enchantedMods);
   }
 
   updateStatus(status) {
     const serverStatus = document.getElementById("serverStatus");
     if (serverStatus) {
-      serverStatus.textContent = `Server ${status === "online" ? "Online" : "Offline"}`;
+      serverStatus.textContent = `Server: ${
+        status === "online" ? "Online" : "Offline"
+      }`;
       serverStatus.className = `status ${status}`;
     }
   }
@@ -260,16 +477,22 @@ class HeistAnalyzer {
     const filePath = document.getElementById("filePath");
 
     if (fileStatus) {
-      if (stats && stats.totalWings !== undefined) {
-        fileStatus.textContent = `Wings: ${stats.totalWings} | Items: ${stats.totalItems}`;
+      if (stats && stats.exists) {
+        const sizeKB = Math.round(stats.totalSize / 1024);
+        const timeStr = stats.lastModified
+          ? new Date(stats.lastModified).toLocaleTimeString()
+          : "N/A";
+        fileStatus.textContent = `Files: ${stats.fileCount} (${sizeKB}KB, ${timeStr})`;
         fileStatus.className = "status online";
       } else {
-        fileStatus.textContent = "No Data";
+        fileStatus.textContent = "Files: Not Found";
         fileStatus.className = "status offline";
       }
     }
-    if (filePath && this.currentLeague) {
-      filePath.textContent = `${this.currentLeague}/**/*.json`;
+
+    if (filePath) {
+      filePath.textContent =
+        "C:/Users/jessi/OneDrive/Desktop/transfer/exports/**/*.json";
     }
   }
 

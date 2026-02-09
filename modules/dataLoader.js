@@ -6,116 +6,102 @@ export class DataLoader {
   constructor() {
     this.data = [];
     this.processor = new DataProcessor();
-    this.dataFormat = null;
-    this.wings = [];
-  }
-
-  loadCSV(csvText) {
-    const parser = new CSVProcessor(csvText);
-    this.data = parser.parse();
-    this.dataFormat = "csv";
-    return this.data;
-  }
-
-  loadJSON(jsonData) {
-    const parser = new JSONProcessor(jsonData);
-    this.data = parser.parse();
-    this.wings = parser.getWings();
-    this.dataFormat = "json";
-    return this.data;
-  }
-
-  loadData(data) {
-    if (typeof data === "string") {
-      return this.loadCSV(data);
-    } else if (typeof data === "object") {
-      return this.loadJSON(data);
-    } else {
-      throw new Error("Unknown data format");
-    }
-  }
-
-  getDataFormat() {
-    return this.dataFormat;
-  }
-
-  getWings() {
-    return this.wings;
-  }
-
-  getWingStats() {
-    if (this.dataFormat !== "json") {
-      return null;
-    }
-
-    const stats = {
-      totalWings: this.wings.length,
-      wingsByZone: {},
-      wingsByLeague: {},
-      totalItems: this.data.length,
+    this.jsonProcessor = new JSONProcessor();
+    this.currentFilters = {
+      leagueName: "All",
+      characterName: "All",
     };
+  }
+  loadJSON(jsonData) {
+    const items = this.jsonProcessor.parseSingle(jsonData);
+    this.data = items;
+    return this.data;
+  }
 
-    this.wings.forEach((wing) => {
-      if (!stats.wingsByZone[wing.zoneName]) {
-        stats.wingsByZone[wing.zoneName] = 0;
-      }
-      stats.wingsByZone[wing.zoneName]++;
+  loadMultipleJSON(jsonFiles) {
+    this.data = this.jsonProcessor.parseMultiple(jsonFiles);
+    return this.data;
+  }
 
-      if (!stats.wingsByLeague[wing.league]) {
-        stats.wingsByLeague[wing.league] = 0;
-      }
-      stats.wingsByLeague[wing.league]++;
-    });
+  setLeagueFilter(leagueName) {
+    this.currentFilters.leagueName = leagueName;
+  }
 
-    return stats;
+  setCharacterFilter(characterName) {
+    this.currentFilters.characterName = characterName;
+  }
+
+  getFilteredData() {
+    let filtered = this.data;
+
+    if (
+      this.currentFilters.leagueName &&
+      this.currentFilters.leagueName !== "All"
+    ) {
+      filtered = this.processor.filterByLeague(
+        filtered,
+        this.currentFilters.leagueName,
+      );
+    }
+
+    if (
+      this.currentFilters.characterName &&
+      this.currentFilters.characterName !== "All"
+    ) {
+      filtered = this.processor.filterByCharacter(
+        filtered,
+        this.currentFilters.characterName,
+      );
+    }
+
+    return filtered;
+  }
+
+  getAvailableLeagues() {
+    return this.processor.getUniqueLeagues(this.data);
+  }
+
+  getAvailableCharacters() {
+    return this.processor.getUniqueCharacters(this.data);
   }
 
   getReplicaItems() {
-    return this.processor.getReplicaItems(this.data);
-  }
-
-  getUniqueItems() {
-    return this.processor.getUniqueItems(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getUniqueItems(filtered);
   }
 
   getHeistBaseItems() {
-    return this.processor.getHeistBaseItems(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getHeistBaseItems(filtered);
   }
 
   getRareItems() {
-    return this.processor.getRareItems(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getRareItems(filtered);
   }
 
   getThiefTrinkets() {
-    return this.processor.getThiefsTrinkets(this.data);
-  }
-
-  getAllClassNames() {
-    return this.processor.getAllClassNames(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getThiefsTrinkets(filtered);
   }
 
   getRareItemMods() {
-    return this.processor.getRareItemMods(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getRareItemMods(filtered);
   }
 
   getTrinketMods() {
-    return this.processor.getTrinketMods(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getTrinketMods(filtered);
   }
 
   getEnchantedMods() {
-    return this.processor.getEnchantedMods(this.data);
+    const filtered = this.getFilteredData();
+    return this.processor.getEnchantedMods(filtered);
   }
 
   getStats() {
-    const baseStats = this.processor.getStats(this.data);
-
-    if (this.dataFormat === "json") {
-      const wingStats = this.getWingStats();
-      return {
-        ...baseStats,
-        wingStats,
-      };
-    }
-    return baseStats;
+    const filtered = this.getFilteredData();
+    return this.processor.getStats(filtered);
   }
 }
