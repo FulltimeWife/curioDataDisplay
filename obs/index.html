@@ -25,7 +25,10 @@
         padding: 12px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         border: 2px solid rgba(102, 126, 234, 0.5);
-        min-width: 300px;
+        display: inline-block;
+        width: auto;
+        min-width: unset;
+        max-width: 100vw;
       }
       .panel-title {
         font-size: 1.2rem;
@@ -67,6 +70,7 @@
         margin-top: 10px;
         padding-top: 10px;
         border-top: 2px solid rgba(102, 126, 234, 0.3);
+        width: 100%;
       }
       .item-section {
         display: flex;
@@ -199,6 +203,7 @@
           ],
           "T0 Replicas": [
             "Replica Bated Breath",
+            "Replica Cortex",
             "Replica Duskdawn",
             "Replica Headhunter",
             "Replica Kongor's Undying Rage",
@@ -206,6 +211,7 @@
             "Replica Tukohama's Fortress",
           ],
           Uniques: ["Crest of Desire", "Expedition's End", "The Fulcrum"],
+          Currency: ["Tailoring Orb", "Tempering Orb"],
         },
         panelTitle: "Heist Stats",
       };
@@ -232,28 +238,119 @@
       }
 
       function updateDisplay(data) {
+        // perform incremental DOM updates to avoid full re-render (prevents OBS visual flash)
         previousData = currentData;
         currentData = data;
         const content = document.getElementById("content");
-        let html = `<div class="stats-panel"><div class="panel-title">${CONFIG.panelTitle}</div>
-        <div class="stat-row"><div class="stat-label">Wings Ran</div><div class="stat-value ${hasChanged("wingsRan") ? "updated" : ""}">${data.wingsRan.toLocaleString()}</div></div>
-        <div class="stat-row"><div class="stat-label">Items Seen</div><div class="stat-value ${hasChanged("itemsSeen") ? "updated" : ""}">${data.itemsSeen.toLocaleString()}</div></div>`;
-        if (Object.keys(data.itemCounts).length > 0) {
-          html += `<div class="categories-container">`;
-          Object.entries(CONFIG.trackedItems).forEach(([category, items]) => {
-            html += `<div class="item-section"><div class="item-section-title">${category}</div><div class="items-container">`;
-            items.forEach((itemName) => {
-              const count = data.itemCounts[itemName] || 0;
-              const changed = hasChangedItem(itemName);
-              html += `<div class="item-chip"><div class="item-name">${itemName}</div><div class="item-count ${count === 0 ? "zero" : ""} ${changed ? "updated" : ""}">${count}</div></div>`;
+
+        // build the panel once on first render
+        if (!content.querySelector(".stats-panel")) {
+          content.innerHTML = "";
+
+          const panel = document.createElement("div");
+          panel.className = "stats-panel";
+
+          const title = document.createElement("div");
+          title.className = "panel-title";
+          title.textContent = CONFIG.panelTitle;
+          panel.appendChild(title);
+
+          // stat rows (with data-field for easy updates)
+          const wingsRow = document.createElement("div");
+          wingsRow.className = "stat-row";
+          wingsRow.innerHTML = `<div class="stat-label">Wings Ran</div><div class="stat-value" data-field="wingsRan">${data.wingsRan.toLocaleString()}</div>`;
+          panel.appendChild(wingsRow);
+
+          const itemsRow = document.createElement("div");
+          itemsRow.className = "stat-row";
+          itemsRow.innerHTML = `<div class="stat-label">Items Seen</div><div class="stat-value" data-field="itemsSeen">${data.itemsSeen.toLocaleString()}</div>`;
+          panel.appendChild(itemsRow);
+
+          // categories / item chips
+          if (Object.keys(data.itemCounts).length > 0) {
+            const categoriesContainer = document.createElement("div");
+            categoriesContainer.className = "categories-container";
+
+            Object.entries(CONFIG.trackedItems).forEach(([category, items]) => {
+              const section = document.createElement("div");
+              section.className = "item-section";
+
+              const sectionTitle = document.createElement("div");
+              sectionTitle.className = "item-section-title";
+              sectionTitle.textContent = category;
+              section.appendChild(sectionTitle);
+
+              const itemsContainer = document.createElement("div");
+              itemsContainer.className = "items-container";
+
+              items.forEach((itemName) => {
+                const count = data.itemCounts[itemName] || 0;
+                const chip = document.createElement("div");
+                chip.className = "item-chip";
+                chip.dataset.itemName = itemName;
+                chip.innerHTML = `<div class="item-name">${itemName}</div><div class="item-count ${count === 0 ? "zero" : ""}">${count.toLocaleString()}</div>`;
+                itemsContainer.appendChild(chip);
+              });
+
+              section.appendChild(itemsContainer);
+              categoriesContainer.appendChild(section);
             });
-            html += `</div></div>`;
-          });
-          html += `</div>`;
+
+            panel.appendChild(categoriesContainer);
+          }
+
+          const lastUpdate = document.createElement("div");
+          lastUpdate.className = "last-update";
+          lastUpdate.textContent = `Last update: ${new Date(data.timestamp).toLocaleTimeString()}`;
+          panel.appendChild(lastUpdate);
+
+          content.appendChild(panel);
+          return; // initial build complete
         }
-        const updateTime = new Date(data.timestamp).toLocaleTimeString();
-        html += `<div class="last-update">Last update: ${updateTime}</div></div>`;
-        content.innerHTML = html;
+
+        // incremental updates for subsequent renders
+        // numeric stats
+        updateNumericStat("wingsRan", data.wingsRan);
+        updateNumericStat("itemsSeen", data.itemsSeen);
+
+        // update item counts (only change text + classes when value differs)
+        const allTrackedItems = Object.values(CONFIG.trackedItems).flat();
+        allTrackedItems.forEach((itemName) => {
+          const count = data.itemCounts[itemName] || 0;
+          const chip = content.querySelector(
+            `.item-chip[data-item-name="${itemName.replace(/"/g, '\\"')}"]`,
+          );
+          if (chip) {
+            const countEl = chip.querySelector(".item-count");
+            const prevCount = previousData
+              ? previousData.itemCounts[itemName] || 0
+              : null;
+            if (prevCount === null || prevCount !== count) {
+              countEl.textContent = count.toLocaleString();
+              countEl.classList.toggle("zero", count === 0);
+              // pulse highlight when changed
+              countEl.classList.add("updated");
+              setTimeout(() => countEl.classList.remove("updated"), 700);
+            }
+          }
+        });
+
+        // update last-update text
+        const lastUpdateEl = content.querySelector(".last-update");
+        if (lastUpdateEl)
+          lastUpdateEl.textContent = `Last update: ${new Date(data.timestamp).toLocaleTimeString()}`;
+      }
+
+      function updateNumericStat(field, value) {
+        const content = document.getElementById("content");
+        const el = content.querySelector(`.stat-value[data-field="${field}"]`);
+        if (!el) return;
+        const prevVal = previousData ? previousData[field] : null;
+        if (prevVal === null || prevVal !== value) {
+          el.textContent = value.toLocaleString();
+          el.classList.add("updated");
+          setTimeout(() => el.classList.remove("updated"), 700);
+        }
       }
       function showError(message) {
         document.getElementById("content").innerHTML =

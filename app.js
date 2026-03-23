@@ -2,6 +2,7 @@ import { DataLoader } from "./modules/dataLoader.js";
 import { ChartManager } from "./modules/chartManager.js";
 import { FileWatcher } from "./modules/fileWatcher.js";
 import { StatsDisplay } from "./components/StatsDisplay.js";
+import { DropRateDisplay } from "./components/DropRateDisplay.js";
 import { ErrorHandler } from "./components/ErrorHandler.js";
 
 class HeistAnalyzer {
@@ -10,6 +11,7 @@ class HeistAnalyzer {
     this.chartManager = new ChartManager();
     this.fileWatcher = new FileWatcher();
     this.statsDisplay = new StatsDisplay("statsDisplay");
+    this.dropRateDisplay = new DropRateDisplay("dropRatePanel");
     this.errorHandler = new ErrorHandler();
 
     this.isLoading = false;
@@ -321,6 +323,19 @@ class HeistAnalyzer {
     this.hasData = true;
     this.statsDisplay.update(stats);
     this.createCharts();
+
+    // update drop-rate table (items per wing)
+    const replicaItems = this.dataLoader.getReplicaItems();
+    const uniqueItems = this.dataLoader.getUniqueItems();
+    const heistBaseItems = this.dataLoader.getHeistBaseItems();
+    const filtered = this.dataLoader.getFilteredData();
+    const wingsRan = Math.round(filtered.length / 5) || 0;
+    this.dropRateDisplay.update({
+      replicaItems,
+      heistBaseItems,
+      uniqueItems,
+      wingsRan,
+    });
 
     const timeStr = new Date().toLocaleTimeString();
     const updateTimeEl = document.getElementById("updateTime");

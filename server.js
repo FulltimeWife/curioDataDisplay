@@ -50,6 +50,7 @@ function parseJsonData(jsonText, sourcePath = null) {
         Partial: metadata.partial,
         AreaLevel: metadata.areaLevel,
         HeistId: metadata.heistId,
+        timestamp: reward.timestamp || null,
       });
     });
     return items;
@@ -284,6 +285,12 @@ app.get("/api/obs/stats", (req, res) => {
       timestamp: new Date().toISOString(),
     };
     res.json(response);
+    console.log(`Total Items: ${totalItems} (Wings: ${totalItems / 5})`);
+    if (totalItems % 5 !== 0) {
+      console.log(
+        `Potential partial, items found: ${totalItems}, has a remainder of: ${totalItems % 5}`,
+      );
+    }
   } catch (error) {
     console.error("Error in OBS stats endpoint:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -326,6 +333,132 @@ app.post("/api/obs/stats", (req, res) => {
   }
 });
 
+app.get("/api/obs/timeline", (req, res) => {
+  try {
+    const leagueFilter = req.query.league;
+    const limit = req.query.limit ? parseInt(req.query.limit) : null;
+
+    const TRACKED_ITEMS = {
+      Jewellery: [
+        "Cogwork Ring",
+        "Geodesic Ring",
+        "Helical Ring",
+        "Manifold Ring",
+        "Astrolabe Amulet",
+        "Focused Amulet",
+        "Simplex Amulet",
+      ],
+      "T1 Replicas": [
+        "Replica Atziri's Acuity",
+        "Replica Alberon's Warpath",
+        "Replica Badge of the Brotherhood",
+        "Replica Covenant",
+        "Replica Eternity Shroud",
+        "Replica Farrul's Fur",
+        "Replica Hyrri's Ire",
+        "Replica Maloney's Mechanism",
+        "Replica Nebulis",
+        "Replica Poorjoy's Asylum",
+        "Replica Trypanon",
+        "Replica Windripper",
+      ],
+      "T0 Replicas": [
+        "Replica Bated Breath",
+        "Replica Cortex",
+        "Replica Duskdawn",
+        "Replica Headhunter",
+        "Replica Kongor's Undying Rage",
+        "Replica Shroud of the Lightless",
+        "Replica Tukohama's Fortress",
+      ],
+      Uniques: ["Crest of Desire", "Expedition's End", "The Fulcrum"],
+    };
+
+    function isTrackedItem(itemName) {
+      for (const category in TRACKED_ITEMS) {
+        if (TRACKED_ITEMS[category].includes(itemName)) {
+          return category;
+        }
+      }
+      return null;
+    }
+
+    let filteredData = parsedData;
+    if (leagueFilter && leagueFilter !== "All") {
+      filteredData = parsedData.filter(
+        (item) => item.LeagueName === leagueFilter,
+      );
+    }
+
+    const trackedItems = [];
+    let wingNumber = 0;
+
+    const heistGroups = new Map();
+    filteredData.forEach((item) => {
+      if (!item.HeistId) return;
+      if (!heistGroups.has(item.HeistId)) {
+        heistGroups.set(item.HeistId, []);
+      }
+      heistGroups.get(item.HeistId).push(item);
+    });
+
+    const sortedHeists = Array.from(heistGroups.entries()).sort((a, b) => {
+      const timeA = new Date(a[1][0].timestamp || 0);
+      const timeB = new Date(b[1][0].timestamp || 0);
+      return timeA - timeB;
+    });
+
+    sortedHeists.forEach(([heistId, items]) => {
+      wingNumber++;
+
+      items.forEach((item) => {
+        const displayCategory = isTrackedItem(item.DisplayName);
+        if (displayCategory) {
+          trackedItems.push({
+            heistId: heistId,
+            wingNumber: wingNumber,
+            itemName: item.DisplayName,
+            category: displayCategory,
+            timestamp: item.timestamp,
+            leagueName: item.LeagueName,
+            zoneName: item.ZoneName,
+            areaLevel: item.AreaLevel,
+          });
+        }
+
+        const baseCategory = isTrackedItem(item.BaseName);
+        if (baseCategory && item.BaseName !== item.DisplayName) {
+          trackedItems.push({
+            heistId: heistId,
+            wingNumber: wingNumber,
+            itemName: item.BaseName,
+            category: baseCategory,
+            timestamp: item.timestamp,
+            leagueName: item.LeagueName,
+            zoneName: item.ZoneName,
+            areaLevel: item.AreaLevel,
+          });
+        }
+      });
+    });
+
+    trackedItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const itemsToReturn = limit ? trackedItems.slice(0, limit) : trackedItems;
+
+    res.json({
+      items: itemsToReturn,
+      totalItems: trackedItems.length,
+      totalWings: wingNumber,
+      league: leagueFilter || "All",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error in timeline endpoint:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 loadAllJsonFiles();
 const watcher = setupFileWatcher();
 
@@ -339,6 +472,8 @@ app.listen(PORT, () => {
   console.log(`   http://localhost:${PORT}/api/obs/stats`);
   console.log(`   OBS Overlay:`);
   console.log(`   http://localhost:${PORT}/obs/index.html`);
+  console.log(`   http://localhost:${PORT}/obs/feed-recent-drops.html`);
+  console.log(`   http://localhost:${PORT}/obs/carousel-timeline.html`);
 });
 
 process.on("SIGINT", () => {

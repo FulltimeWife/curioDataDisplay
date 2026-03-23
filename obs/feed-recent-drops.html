@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recent Drops Feed - OBS Overlay</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: transparent;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: white;
+        overflow: hidden;
+        padding: 20px;
+      }
+
+      .feed-container {
+        background: rgba(0, 0, 0, 0.85);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        border: 2px solid rgba(102, 126, 234, 0.5);
+        min-width: 400px;
+        max-width: 500px;
+      }
+
+      .feed-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #667eea;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+        padding-bottom: 10px;
+        text-align: center;
+      }
+
+      .feed-items {
+        position: relative;
+        min-height: 300px;
+      }
+
+      .feed-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        margin-bottom: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        border-left: 3px solid #667eea;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
+
+      /* Slide in from top animation */
+      @keyframes slideInFromTop {
+        from {
+          transform: translateY(-100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      /* Slide out to bottom animation */
+      @keyframes slideOutToBottom {
+        from {
+          transform: translateY(0);
+          opacity: 1;
+          max-height: 100px;
+          margin-bottom: 8px;
+        }
+        to {
+          transform: translateY(20px);
+          opacity: 0;
+          max-height: 0;
+          margin-bottom: 0;
+        }
+      }
+
+      /* New item animation */
+      @keyframes pulseGlow {
+        0%,
+        100% {
+          box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+          border-left-color: #667eea;
+        }
+        50% {
+          box-shadow: 0 0 20px rgba(102, 126, 234, 1);
+          border-left-color: #764ba2;
+        }
+      }
+
+      .feed-item.new {
+        animation:
+          slideInFromTop 0.5s ease,
+          pulseGlow 1s ease 0.5s;
+      }
+
+      .feed-item.removing {
+        animation: slideOutToBottom 0.5s ease forwards;
+      }
+
+      .item-icon {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        flex-shrink: 0;
+        filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+      }
+
+      .item-icon.placeholder {
+        background: linear-gradient(
+          135deg,
+          rgba(102, 126, 234, 0.3) 0%,
+          rgba(118, 75, 162, 0.3) 100%
+        );
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .item-info {
+        flex: 1;
+        min-width: 0; /* For text truncation */
+      }
+
+      .item-name {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #e0e0e0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .item-meta {
+        font-size: 0.85rem;
+        color: #999;
+        margin-top: 2px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .item-category {
+        color: #667eea;
+        font-weight: 500;
+      }
+
+      .item-time {
+        color: #888;
+      }
+
+      .wing-badge {
+        background: rgba(102, 126, 234, 0.3);
+        color: #667eea;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        white-space: nowrap;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #667eea;
+        font-size: 1.2rem;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #888;
+      }
+
+      .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 10px;
+        opacity: 0.3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="feed-container">
+      <div class="feed-title">Recent Drops</div>
+      <div class="feed-items" id="feedItems">
+        <div class="loading">Connecting...</div>
+      </div>
+    </div>
+
+    <script>
+      const CONFIG = {
+        apiUrl: "http://localhost:3000/api/obs/timeline",
+        refreshInterval: 15000,
+        timeRefreshInterval: 30000,
+        maxItems: 5,
+        league: "Phrecia 2.0",
+        trackedCategories: [
+          "Jewellery",
+          "T1 Replicas",
+          "T0 Replicas",
+          "Uniques",
+        ],
+
+        iconPath: "icons/",
+        showIcons: false,
+
+        slideInDuration: 500,
+        slideOutDuration: 500,
+        glowDuration: 1000,
+      };
+
+      let currentItems = [];
+      let knownItemIds = new Set();
+
+      async function fetchRecentDrops() {
+        try {
+          const params = new URLSearchParams();
+          if (CONFIG.league) {
+            params.append("league", CONFIG.league);
+          }
+          params.append("limit", CONFIG.maxItems);
+
+          const url = `${CONFIG.apiUrl}?${params.toString()}`;
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          updateFeed(data.items || []);
+        } catch (error) {
+          console.error("Error fetching recent drops:", error);
+          showError();
+        }
+      }
+
+      function updateFeed(newItems) {
+        const feedContainer = document.getElementById("feedItems");
+
+        if (newItems.length === 0) {
+          if (currentItems.length === 0) {
+            showEmptyState();
+          }
+          return;
+        }
+
+        const newItemsToAdd = newItems.filter((item) => {
+          const itemId = `${item.heistId}-${item.itemName}-${item.timestamp}`;
+          return !knownItemIds.has(itemId);
+        });
+
+        if (newItemsToAdd.length > 0) {
+          newItemsToAdd.forEach((item) => {
+            const itemId = `${item.heistId}-${item.itemName}-${item.timestamp}`;
+            knownItemIds.add(itemId);
+          });
+
+          currentItems = newItems;
+          renderFeed(true);
+        } else if (currentItems.length !== newItems.length) {
+          currentItems = newItems;
+          renderFeed(false);
+        }
+      }
+
+      function renderFeed(hasNewItems = false) {
+        const feedContainer = document.getElementById("feedItems");
+
+        feedContainer.innerHTML = "";
+
+        currentItems.forEach((item, index) => {
+          const itemEl = createItemElement(item, index === 0 && hasNewItems);
+          feedContainer.appendChild(itemEl);
+        });
+
+        refreshTimeLabels();
+      }
+
+      function createItemElement(item, isNew = false) {
+        const itemEl = document.createElement("div");
+        itemEl.className = `feed-item${isNew ? " new" : ""}`;
+
+        itemEl.dataset.timestamp = item.timestamp;
+        itemEl.dataset.itemId = `${item.heistId}-${item.itemName}-${item.timestamp}`;
+
+        let iconHtml = "";
+        if (CONFIG.showIcons && item.iconPath) {
+          iconHtml = `<img src="${CONFIG.iconPath}${item.iconPath}" class="item-icon" alt="${item.itemName}" onerror="this.classList.add('placeholder')">`;
+        }
+        const timeAgo = getTimeAgo(item.timestamp);
+
+        itemEl.innerHTML = `
+        ${iconHtml}
+        <div class="item-info">
+          <div class="item-name">${item.itemName}</div>
+          <div class="item-meta">
+            <span class="item-category">${item.category}</span>
+            <span class="item-time">${timeAgo}</span>
+          </div>
+        </div>
+        <div class="wing-badge">Wing ${item.wingNumber}</div>
+      `;
+
+        return itemEl;
+      }
+
+      function getTimeAgo(timestamp) {
+        const now = new Date();
+        const then = new Date(timestamp);
+        const diffMs = now - then;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return "Just now";
+        if (diffMins === 1) return "1 min ago";
+        if (diffMins < 60) return `${diffMins} mins ago`;
+
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours === 1) return "1 hour ago";
+        if (diffHours < 24) return `${diffHours} hours ago`;
+
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays === 1) return "1 day ago";
+        return `${diffDays} days ago`;
+      }
+
+      function showEmptyState() {
+        const feedContainer = document.getElementById("feedItems");
+        feedContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📭</div>
+          <div>No recent drops yet</div>
+        </div>
+      `;
+      }
+
+      function showError() {
+        const feedContainer = document.getElementById("feedItems");
+        feedContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">⚠️</div>
+          <div>Connection error</div>
+        </div>
+      `;
+      }
+      fetchRecentDrops();
+
+      function refreshTimeLabels() {
+        const feedItems = document.querySelectorAll(".feed-item");
+        feedItems.forEach((el) => {
+          const ts = el.dataset.timestamp;
+          if (!ts) return;
+          const timeEl = el.querySelector(".item-time");
+          if (timeEl) timeEl.textContent = getTimeAgo(ts);
+        });
+      }
+
+      setInterval(fetchRecentDrops, CONFIG.refreshInterval);
+      setInterval(refreshTimeLabels, CONFIG.timeRefreshInterval);
+
+      refreshTimeLabels();
+
+      console.log("Recent Drops Feed initialized:", CONFIG);
+    </script>
+  </body>
+</html>

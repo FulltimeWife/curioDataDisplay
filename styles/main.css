@@ -245,6 +245,67 @@ button:active {
   grid-column: 1 / -1;
 }
 
+/* Drop rates panel - full width */
+.drop-rate-panel {
+  grid-column: 1 / -1;
+  padding: 18px;
+}
+
+.drop-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.drop-rate-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: #2c3e50;
+  font-weight: 700;
+}
+
+.drop-rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.drop-rate-table th,
+.drop-rate-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.drop-rate-table th {
+  font-weight: 700;
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.drop-rate-table tbody tr:hover {
+  background: rgba(102, 126, 234, 0.03);
+}
+
+.drop-rate-table .item-name {
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drop-rate-empty,
+.drop-rate-section .empty {
+  color: #95a5a6;
+  padding: 12px;
+  background: rgba(245, 245, 245, 0.8);
+  border-radius: 8px;
+  text-align: center;
+}
+
 .stats-panel h2 {
   margin-bottom: 20px;
   color: #2c3e50;

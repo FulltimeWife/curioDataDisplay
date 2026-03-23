@@ -27,7 +27,7 @@ export class ChartHelper {
   createHeistBaseChartData(heistBases) {
     const heistBaseCounts = {};
     heistBases.forEach((heistBase) => {
-      const name = heistBase.DisplayName;
+      const name = heistBase.BaseName;
       heistBaseCounts[name] = (heistBaseCounts[name] || 0) + 1;
     });
 
